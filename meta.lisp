@@ -40,7 +40,9 @@
          (name (list c-name n-name))
 
          (docstring (when (stringp (car args)) (pop args)))
-         (ret (gensym)))
+         (ret (gensym))
+         (retry (gensym))
+         (errno (gensym)))
     (loop with opt
        for i in args
        unless (consp i) do (setq opt t)
@@ -57,18 +59,18 @@
                     (defun ,l-name (,@names ,@(when opts-init `(&optional ,@opts-init)))
                       ,docstring
                       (let (,ret)
-                        (tagbody retry
+                        (tagbody ,retry
                            (setf ,ret (,n-name ,@names ,@opts))
                            (if ,(if (eq return-type :pointer)
                                     `(zerop (pointer-address ,ret))
                                     `(not (zerop ,ret)))
-                               (let ((errno (errno)))
+                               (let ((,errno (errno)))
                                  (cond
                                    #-windows
-                                   ((eq errno isys:ewouldblock) (error 'error-again :argument errno))
-                                   ((eq errno isys:eintr)
+                                   ((eq ,errno isys:ewouldblock) (error 'error-again :argument ,errno))
+                                   ((eq ,errno isys:eintr)
                                     (unless *retry-on-eintr*
-                                      (cerror "Retry" 'error-eintr :argument errno))
-                                    (go retry))
-                                   (t (error (convert-from-foreign (%strerror errno) :string)))))))
+                                      (cerror "Retry" 'error-eintr :argument ,errno))
+                                    (go ,retry))
+                                   (t (error (convert-from-foreign (%strerror ,errno) :string)))))))
                         ,ret)))))))
